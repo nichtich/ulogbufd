@@ -1,0 +1,66 @@
+ulogbufd 0.1
+6 March 2001
+jdw@panix.com
+
+QUICKSTART:  Create a fifo.  Have an application log to that fifo.  Run
+"ulogbufd <fifo> <dumpfile>".  Send ulogbufd a SIGUSR1 to make it dump its
+log buffer to the dumpfile, or run "ulogbufdump <fifo>" to see the buffer
+displayed on screen.  Send ulogbufd a SIGHUP to make it clear its buffer.
+
+	ulogbufd is a tool for managing logs.  Specifically, it listens to
+a named pipe, or fifo, and stores the lines that it reads in an internal
+buffer, which it can dump out on request.  Why might you want such a
+thing?  I wrote it because at work I manage a number of large servers
+which run an application which generates copious logs - so much that
+within 24 hours the logfile can exceed maximum size for its filesystem -
+which almost never have to be looked at.  Now and then we do want to look
+at what's being logged.  We could rotate every hour or so, but that's ugly
+and generates a lot of files we never look at, and this program requires a
+restart every time its logs are rotated.  We tried routing the logs to
+/dev/null, but that required stopping and restarting the program every
+time we wanted to see the logs.
+
+	ulogbufd was designed to make this sort of situation
+manageable.  Set your application to log to a fifo, and ulogbufd to watch
+the fifo.  It will then store the latest X lines in memory (where X is 
+determined by the user) instead of on disk.  This prevents logs from
+growing out of bounds and yet keeps them available, at least until they
+fall off the end of the buffer.  
+
+	There are two ways of getting the buffer out of ulogbufd.  One is
+to send it a SIGUSR1 ("kill -USR1 pid_of_ulogbufd" in most Unix systems).  
+This will make it dump its buffer to the dumpfile you've defined on the
+command line.  There are options within ulogbufd to clear the dumpfile
+before dumping (so you can't get the same data repeated within the
+file) and/or clear the queue after dumping (so you can't get the same data
+out twice any way).  The second way to get the buffer out is to run
+ulogbufdump with the name of the original log fifo as an argument.  This
+will communicate with the appropriate ulogbufd and display the buffer on
+screen.
+
+	Sending ulogbufd a SIGHUP will make it clear its log
+buffer.  Killing ulogbufd with SIGINT or SIGQUIT will make it clean up
+nicely after itself and exit.  Please do not kill it with SIGKILL, as this
+won't give it a chance to do so and it will at the very least leave its
+lockfile laying around to annoy you the next time you try to run it.
+
+	This utility is still in an early and primitive state and almost
+certainly suffers from some bugs and usability issues.  For example, since
+ulogbufd uses a lockfile with a highly predictable name, it would be
+possible to mount a denial-of-service attack against it by squatting on
+the namespace.  (I doubt this is a serious issue.  You can always edit the
+source to put the lockfiles in a different, more secure place.)  There is
+no external locking on the log fifo to ensure that the data comes from the
+application you expect it to, and none to ensure that data does not get
+stolen from the fifo by another process attempting to read it.  (This is
+an issue that should probably be addressed with ownership and
+permissions.)  The code probably still suffers from some race conditions
+in which if you send it a signal at the right (wrong) time, it will fail
+to do the right thing, although I have made an attempt to be pretty
+careful.
+
+	Enjoy.  I hope somebody out there finds this useful and/or
+interesting, and I'd be curious to hear any feedback anyone has.
+
+JD Weiner,
+jdw@panix.com
